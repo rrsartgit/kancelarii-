@@ -159,3 +159,228 @@ To jest serce produktu, gdzie łączymy użyteczność z potęgą AI.
 *   **Plan Free/Trial:** Ograniczona liczba generacji AI miesięcznie, limit 2 użytkowników i 50 snippetów w bibliotece.
 *   **Plan Pro (dla małych zespołów):** Miesięczna subskrypcja na użytkownika. Większe limity AI, nieograniczona liczba snippetów, podstawowa współpraca.
 *   **Plan Enterprise (dla dużych kancelarii):** Wycena indywidualna. Pełna funkcjonalność, w tym zaawansowana kontrola dostępu, system zatwierdzeń, dedykowane wsparcie i gwarancje SLA.
+*   
+
+
+
+
+
+
+extended
+
+
+
+
+
+
+
+Znakomicie. Skupmy się teraz na przekształceniu **PrawoAsystent** z doskonałego produktu w **lidera rynku i ekosystem**. Te przyszłe funkcje to nie tylko dodatki, ale strategiczne kroki, które głęboko zintegrują aplikację z codziennym przepływem pracy prawnika i otworzą nowe źródła przychodów.
+
+Oto szczegółowa implementacja każdej z tych wizjonerskich funkcji, od architektury po fragmenty kodu.
+
+---
+
+### **1. Integracja z Edytorami Tekstu (MS Word & Google Docs)**
+
+**Wizja:** Prawnik nie musi opuszczać swojego ulubionego edytora. PrawoAsystent jest dostępny jako boczny panel, gotowy do działania w kontekście edytowanego dokumentu.
+
+#### **Architektura Techniczna**
+
+*   **Wspólny Rdzeń Logiki:** Zarówno dodatek do Worda, jak i Google Docs, będą cienkimi klientami (thin clients). Cała logika biznesowa, komunikacja z AI i bazą danych pozostaje w naszym głównym backendzie Flask. Dodatki będą jedynie renderować UI i komunikować się z naszym API.
+*   **Technologia:**
+    *   **MS Word (Office Add-in):** Wykorzystujemy `Office.js` API. Dodatek to w praktyce aplikacja webowa (HTML, CSS, JavaScript/React) hostowana na naszym serwerze i osadzona w panelu bocznym Worda.
+    *   **Google Docs (Google Workspace Add-on):** Używamy `Apps Script` do stworzenia logiki i `Card Service` do zbudowania interfejsu (lub `HTML Service` dla bardziej niestandardowego UI opartego na React).
+*   **Autoryzacja:** Użyjemy protokołu OAuth 2.0. Przy pierwszym uruchomieniu dodatku, użytkownik zostanie przekierowany na stronę logowania PrawoAsystent, aby autoryzować dodatek do dostępu do swojego konta.
+
+#### **Implementacja (Przykład dla MS Word Add-in z React)**
+
+1.  **Stworzenie manifestu (`manifest.xml`):** Plik XML, który opisuje dodatek, jego uprawnienia (np. `ReadWriteDocument`) i lokalizację naszej aplikacji webowej.
+
+2.  **Aplikacja React dla Panelu Bocznego:**
+    ```jsx
+    // WordAddin.js
+    import React, { useState, useEffect } from 'react';
+    import axios from 'axios';
+
+    // Inicjalizacja Office.js
+    // Office.onReady();
+
+    const WordAddin = () => {
+        const [snippets, setSnippets] = useState([]);
+        const [searchTerm, setSearchTerm] = useState('');
+
+        useEffect(() => {
+            // Pobierz snippety z naszego API po załadowaniu
+            const fetchSnippets = async () => {
+                const token = await getAuthToken(); // Funkcja do obsługi OAuth
+                const response = await axios.get('/api/v1/snippets', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                setSnippets(response.data);
+            };
+            fetchSnippets();
+        }, []);
+
+        const handleInsertSnippet = (content) => {
+            Word.run(async (context) => {
+                const range = context.document.getSelection();
+                // Wstawia treść snippetu w miejscu kursora
+                range.insertText(content, Word.InsertLocation.replace);
+                await context.sync();
+            }).catch(error => console.log('Error: ' + error));
+        };
+
+        return (
+            <div>
+                <input 
+                    type="text" 
+                    placeholder="Szukaj snippetu..." 
+                    onChange={e => setSearchTerm(e.target.value)} 
+                />
+                <ul>
+                    {snippets.filter(s => s.title.includes(searchTerm)).map(snippet => (
+                        <li key={snippet.id} onClick={() => handleInsertSnippet(snippet.current_version.content)}>
+                            {snippet.title}
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        );
+    };
+    ```
+
+---
+
+### **2. Silnik Rekomendacji Snippetów**
+
+**Wizja:** Gdy prawnik pisze umowę, system analizuje otaczający tekst i proaktywnie sugeruje: "Wygląda na to, że tworzysz umowę o dzieło. Czy chcesz dodać klauzulę o przeniesieniu praw autorskich?".
+
+#### **Architektura Techniczna**
+
+*   **Podejście hybrydowe (dwa etapy):**
+    1.  **Etap 1 (Szybki i Tani - Embedding-based):**
+        *   Gdy użytkownik przestaje pisać na kilka sekund, dodatek (z Worda/Google Docs) wysyła ostatnie 1-2 paragrafy tekstu do specjalnego endpointu w naszym API.
+        *   Backend tworzy wektor (embedding) dla tego fragmentu tekstu.
+        *   System przeszukuje **bazę wektorową zawierającą wszystkie snippety kancelarii**, aby znaleźć te, które są semantycznie najbliższe.
+        *   Zwraca 3-5 najlepiej pasujących snippetów jako sugestie.
+    2.  **Etap 2 (Zaawansowany - LLM-based):**
+        *   Użytkownik klika przycisk "Głęboka analiza".
+        *   Do API wysyłany jest znacznie większy fragment tekstu (lub cały dokument).
+        *   Backend tworzy prompt dla Gemini, który zawiera ten tekst oraz instrukcję: `"Jesteś asystentem prawnym. Przeanalizuj poniższy dokument i zidentyfikuj potencjalne brakujące klauzule lub obszary, które można uzupełnić. Zasugeruj 3 najbardziej adekwatne snippety z poniższej listy [opcjonalnie można podać listę tytułów snippetów], które mogłyby wzbogacić ten dokument."`
+        *   Gemini zwraca bardziej kontekstowe i inteligentne rekomendacje.
+
+#### **Implementacja (Endpoint dla szybkiego silnika rekomendacji)**
+
+```python
+# W pliku main_api.py
+
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from your_vector_store import vector_store # Zaimportowana instancja bazy wektorowej
+
+@app.route('/api/v1/snippets/recommend', methods=['POST'])
+def recommend_snippets():
+    data = request.get_json()
+    context_text = data.get('context_text')
+    
+    if not context_text:
+        return jsonify({"error": "Context text is required"}), 400
+
+    # Używamy tej samej instancji co w RAG, ale do innego celu
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    
+    # Tworzymy wektor dla kontekstu i szukamy podobnych w bazie wektorowej snippetów
+    results = vector_store.similarity_search(context_text, k=3)
+    
+    recommended_snippets = [
+        {
+            "id": res.metadata['snippet_id'],
+            "title": res.metadata['title'],
+            "reason": "Semantycznie pasuje do Twojego tekstu." 
+        } for res in results
+    ]
+
+    return jsonify(recommended_snippets)
+```
+
+---
+
+### **3. Analityka dla Kancelarii**
+
+**Wizja:** Partner zarządzający loguje się i widzi dashboard, który w przejrzysty sposób pokazuje, jak technologia wpływa na wydajność i koszty kancelarii.
+
+#### **Architektura Techniczna**
+
+*   **Zbieranie Danych:** Musimy logować kluczowe zdarzenia w dedykowanej tabeli `analytics_events`.
+    *   `snippet_created`, `snippet_used`, `ai_generation_invoked`, `user_login`.
+*   **Przetwarzanie Danych:** Można to robić na dwa sposoby:
+    1.  **Na żywo:** Agregowanie danych bezpośrednio z bazy SQL przy ładowaniu dashboardu (dobre dla małej skali).
+    2.  **Batchowo:** Codzienny skrypt (np. cron job), który przetwarza surowe logi i zapisuje zagregowane wyniki w oddzielnych tabelach analitycznych. To znacznie wydajniejsze.
+*   **Wizualizacja:** Użycie biblioteki do wykresów na frontendzie (np. `Chart.js` lub `D3.js`).
+
+#### **Implementacja (Przykładowy schemat tabeli i dashboard)**
+
+**Model `AnalyticsEvent`:**
+```python
+class AnalyticsEvent(db.Model):
+    id = db.Column(db.BigInteger, primary_key=True)
+    event_type = db.Column(db.String(50), nullable=False, index=True) # np. 'snippet_used'
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    law_firm_id = db.Column(db.Integer, db.ForeignKey('law_firm.id'), index=True)
+    metadata = db.Column(db.JSON) # np. {'snippet_id': 123, 'time_saved_estimate_sec': 300}
+    timestamp = db.Column(db.DateTime, server_default=db.func.now(), index=True)
+```
+
+**Frontend (Dashboard):**
+Komponent React, który pobiera dane z endpointów `GET /api/v1/analytics/usage_summary` i `GET /api/v1/analytics/top_users` i renderuje je za pomocą `Chart.js`.
+
+---
+
+### **4. Automatyczne Redlinowanie**
+
+**Wizja:** Prawnik wrzuca dwie wersje umowy (np. swoją i tę, którą odesłał klient), a system w kilka sekund generuje raport z podsumowaniem zmian i oceną ryzyka.
+
+#### **Architektura Techniczna**
+
+*   **Wykorzystanie gigantycznego okna kontekstowego Gemini 1.5 Pro:** To funkcja stworzona dla tego zadania. Nie musimy porównywać plików linia po linii.
+*   **Proces:**
+    1.  Użytkownik wgrywa dwa pliki (Dokument A, Dokument B).
+    2.  Backend odczytuje tekst z obu dokumentów.
+    3.  Tworzony jest bardzo precyzyjny prompt:
+        ```prompt
+        Jesteś ekspertem w analizie umów prawnych. Poniżej znajdują się dwie wersje tej samej umowy: 'Dokument A (Oryginał)' i 'Dokument B (Wersja Zmieniona)'. Twoim zadaniem jest:
+        1.  Zidentyfikować i wylistować wszystkie istotne zmiany (dodane, usunięte i zmodyfikowane klauzule) pomiędzy dokumentami.
+        2.  Dla każdej zmiany, oceń jej potencjalny wpływ i ryzyko dla strony reprezentowanej przez 'Dokument A' w skali od Niskiego do Krytycznego.
+        3.  Zaproponuj kontrpropozycje lub pytania wyjaśniające dla zmian o ryzyku Średnim lub wyższym.
+        Odpowiedz w formacie JSON z listą obiektów, gdzie każdy obiekt ma klucze: 'clause_summary', 'change_type', 'risk_level', 'recommendation'.
+
+        --- DOKUMENT A (ORYGINAŁ) ---
+        [treść dokumentu A]
+
+        --- DOKUMENT B (WERSJA ZMIENIONA) ---
+        [treść dokumentu B]
+        ```
+    4.  Backend wysyła prompt do Gemini 1.5 Pro.
+    5.  Otrzymana odpowiedź JSON jest parsowana i wyświetlana na frontendzie w formie czytelnego raportu.
+
+---
+
+### **5. Marketplace Snippetów**
+
+**Wizja:** Tworzymy ekosystem, w którym najlepsze kancelarie mogą monetyzować swoją wiedzę, a mniejsze podmioty mogą uzyskać dostęp do wysokiej jakości, zweryfikowanych wzorców.
+
+#### **Architektura Techniczna**
+
+*   **Nowe Modele w Bazie Danych:**
+    *   `MarketplacePackage`: Opis pakietu (tytuł, opis, cena, autor-kancelaria).
+    *   `PackageSnippets`: Tabela łącząca pakiety ze snippetami.
+    *   `Purchase`: Zapis transakcji zakupu.
+*   **Proces Publikacji:**
+    1.  Kancelaria-sprzedawca tworzy pakiet i wybiera snippety, które chce w nim umieścić.
+    2.  **Proces Anonimizacji i Weryfikacji (Kluczowy!):**
+        *   Automatyczny skaner AI przeszukuje snippety w poszukiwaniu danych osobowych, nazw firm itp. i flaguje je do ręcznej anonimizacji.
+        *   Nasz wewnętrzny zespół prawny (lub zaufani partnerzy) weryfikuje jakość i uniwersalność pakietu. To buduje zaufanie do marketplace.
+    3.  Po zatwierdzeniu, pakiet staje się widoczny na marketplace.
+*   **Integracja z Płatnościami (Stripe Connect):**
+    *   Używamy Stripe Connect, aby obsłużyć płatności i automatycznie dzielić przychody pomiędzy nas (jako platformę) a kancelarię-sprzedawcę. Stripe zajmuje się skomplikowaną logiką wypłat i rozliczeń.
+
+Te rozszerzenia, choć ambitne, są logicznym następstwem rozwoju platformy. Budują one "fosę" wokół produktu – głęboką integrację, efekty sieciowe (marketplace) i unikalne, trudne do skopiowania funkcjonalności oparte na AI.
