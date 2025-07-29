@@ -1,6 +1,6 @@
-Doskonale. Przyjmuję rolę architekta systemów i menedżera produktu. Twoja prośba jest precyzyjna i dobrze przemyślana, co stanowi świetny fundament do stworzenia produktu najwyższej klasy. Skoncentrujemy się na przekształceniu "Generatora Snippetów" w inteligentny silnik produktywności, który stanie się nieodzownym narzędziem w arsenale nowoczesnego prawnika.
 
-Poniżej znajduje się szczegółowy opis implementacji technicznej oraz koncepcja gotowego produktu, zgodnie z Twoimi wytycznymi.
+
+Poniżej znajduje się szczegółowy opis implementacji technicznej oraz koncepcja gotowego produktu, zgodnie z wytycznymi.
 
 ---
 
