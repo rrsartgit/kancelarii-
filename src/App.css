@@ -1,46 +1,84 @@
+/* Dodatkowe style specyficzne dla App */
 .app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-.main {
+.main-content {
   flex: 1;
 }
 
-/* Dodatkowe style specyficzne dla App */
-.hero {
+/* Animacje */
+.order-card {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Dodatkowe style dla lepszego UX */
+.btn {
   position: relative;
   overflow: hidden;
 }
 
-.hero::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="1" fill="white" opacity="0.1"/><circle cx="10" cy="90" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-  pointer-events: none;
-}
-
-.feature-card {
-  position: relative;
-  overflow: hidden;
-}
-
-.feature-card::before {
+.btn::before {
   content: '';
   position: absolute;
   top: 0;
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
   transition: left 0.5s;
 }
 
-.feature-card:hover::before {
+.btn:hover::before {
   left: 100%;
+}
+
+/* Responsywne poprawki */
+@media (max-width: 480px) {
+  .container {
+    padding: 0 15px;
+  }
+  
+  .order-card {
+    padding: 1rem;
+  }
+  
+  .btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  
+  .filters {
+    flex-direction: column;
+  }
+  
+  .filter-btn {
+    width: 100%;
+  }
 }

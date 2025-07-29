@@ -1,104 +1,78 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import Header from './components/Header'
+import Login from './components/Login'
+import ClientDashboard from './components/ClientDashboard'
+import OperatorDashboard from './components/OperatorDashboard'
+import OrderDetails from './components/OrderDetails'
+import CreateOrder from './components/CreateOrder'
 import './App.css'
 
 function App() {
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Sprawdź czy użytkownik jest zalogowany (localStorage lub token)
+    const savedUser = localStorage.getItem('user')
+    if (savedUser) {
+      setUser(JSON.parse(savedUser))
+    }
+    setLoading(false)
+  }, [])
+
+  const handleLogin = (userData) => {
+    setUser(userData)
+    localStorage.setItem('user', JSON.stringify(userData))
+  }
+
+  const handleLogout = () => {
+    setUser(null)
+    localStorage.removeItem('user')
+  }
+
+  if (loading) {
+    return <div className="loading">Ładowanie...</div>
+  }
+
   return (
     <div className="app">
-      <header className="header">
-        <div className="container">
-          <h1 className="logo">⚖️ PrawoAsystent AI</h1>
-          <nav className="nav">
-            <a href="#features">Funkcje</a>
-            <a href="#about">O nas</a>
-            <a href="#contact">Kontakt</a>
-          </nav>
-        </div>
-      </header>
-
-      <main className="main">
-        <section className="hero">
-          <div className="container">
-            <h2 className="hero-title">
-              Sztuczna Inteligencja dla <span className="highlight">Prawników</span>
-            </h2>
-            <p className="hero-subtitle">
-              Automatyzuj tworzenie dokumentów, analizuj sprawy i zarządzaj wiedzą prawną 
-              z pomocą najnowszych technologii AI
-            </p>
-            <div className="hero-buttons">
-              <button className="btn btn-primary">Rozpocznij za darmo</button>
-              <button className="btn btn-secondary">Zobacz demo</button>
-            </div>
-          </div>
-        </section>
-
-        <section id="features" className="features">
-          <div className="container">
-            <h3 className="section-title">Kluczowe Funkcjonalności</h3>
-            <div className="features-grid">
-              <div className="feature-card">
-                <div className="feature-icon">📝</div>
-                <h4>Generator Snippetów</h4>
-                <p>Twórz precyzyjne klauzule prawne w sekundach dzięki AI</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">🎙️</div>
-                <h4>Analiza Audio</h4>
-                <p>Transkrypcja rozpraw z identyfikacją mówców</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">🔍</div>
-                <h4>Wyszukiwanie RAG</h4>
-                <p>Inteligentne odpowiedzi na pytania prawne</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">🛒</div>
-                <h4>Marketplace</h4>
-                <p>Kupuj i sprzedawaj zweryfikowane wzorce</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">⚡</div>
-                <h4>Monitor Prawa</h4>
-                <p>Automatyczne śledzenie zmian w przepisach</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">📊</div>
-                <h4>Analiza Umów</h4>
-                <p>Porównywanie wersji z oceną ryzyka</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="stats">
-          <div className="container">
-            <div className="stats-grid">
-              <div className="stat">
-                <div className="stat-number">85%</div>
-                <div className="stat-label">Oszczędność czasu</div>
-              </div>
-              <div className="stat">
-                <div className="stat-number">500+</div>
-                <div className="stat-label">Kancelarii</div>
-              </div>
-              <div className="stat">
-                <div className="stat-number">10k+</div>
-                <div className="stat-label">Snippetów</div>
-              </div>
-              <div className="stat">
-                <div className="stat-number">99.9%</div>
-                <div className="stat-label">Uptime</div>
-              </div>
-            </div>
-          </div>
-        </section>
+      <Header user={user} onLogout={handleLogout} />
+      
+      <main className="main-content">
+        <Routes>
+          <Route 
+            path="/login" 
+            element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/dashboard" />} 
+          />
+          
+          <Route 
+            path="/dashboard" 
+            element={
+              user ? (
+                user.role === 'CLIENT' ? <ClientDashboard /> : <OperatorDashboard />
+              ) : (
+                <Navigate to="/login" />
+              )
+            } 
+          />
+          
+          <Route 
+            path="/create-order" 
+            element={user?.role === 'CLIENT' ? <CreateOrder /> : <Navigate to="/login" />} 
+          />
+          
+          <Route 
+            path="/order/:id" 
+            element={user ? <OrderDetails userRole={user.role} /> : <Navigate to="/login" />} 
+          />
+          
+          <Route 
+            path="/" 
+            element={user ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} 
+          />
+        </Routes>
       </main>
-
-      <footer className="footer">
-        <div className="container">
-          <p>&copy; 2024 PrawoAsystent AI. Wszystkie prawa zastrzeżone.</p>
-        </div>
-      </footer>
     </div>
   )
 }
